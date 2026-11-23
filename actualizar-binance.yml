@@ -1,0 +1,137 @@
+name: Cotizaciones Binance P2P y publicar web
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/15 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: paginas-envios-ya
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacion.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Consultar precios públicos de Binance
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request, urllib.parse, datetime, time
+          from pathlib import Path
+
+          USER_AGENT = 'Mozilla/5.0 (compatible; EnviosYaRateWatcher/1.0)'
+
+          def get_json(url, payload=None):
+              headers = {'Accept': 'application/json', 'User-Agent': USER_AGENT}
+              body = None
+              if payload is not None:
+                  body = json.dumps(payload).encode('utf-8')
+                  headers.update({'Content-Type': 'application/json', 'Origin': 'https://p2p.binance.com'})
+              request = urllib.request.Request(url, data=body, headers=headers,
+                                               method='POST' if body else 'GET')
+              with urllib.request.urlopen(request, timeout=18) as resp:
+                  return json.load(resp)
+
+          def extract_rows(blob):
+              if isinstance(blob, list):
+                  return blob
+              if not isinstance(blob, dict):
+                  return []
+              for part in ('data', 'list', 'ads', 'advList', 'rows', 'items', 'records', 'result'):
+                  if part in blob:
+                      rows = extract_rows(blob[part])
+                      if rows:
+                          return rows
+              return []
+
+          def parse_ad(item):
+              adv = item.get('adv') if isinstance(item, dict) else None
+              if not isinstance(adv, dict):
+                  adv = item
+              if not isinstance(adv, dict):
+                  return None
+              try:
+                  price = float(adv.get('price') or adv.get('priceRate') or 0)
+              except (TypeError, ValueError):
+                  return None
+              if not (0 < price < 10000000):
+                  return None
+              advertiser = item.get('advertiser') or item.get('user') or {}
+              if not isinstance(advertiser, dict):
+                  advertiser = {}
+              merchant = advertiser.get('nickName') or adv.get('nickName') or 'Anunciante P2P'
+              methods = adv.get('tradeMethods') or adv.get('payTypes') or item.get('tradeMethods') or []
+              method_names = []
+              for method in methods if isinstance(methods, list) else []:
+                  if isinstance(method, dict):
+                      name = method.get('tradeMethodName') or method.get('identifier') or method.get('paymentType')
+                  else:
+                      name = str(method)
+                  if name:
+                      method_names.append(str(name)[:70])
+              return {'price': round(price, 4), 'merchant': str(merchant)[:90],
+                      'methods': ', '.join(method_names[:8])}
+
+          def fetch_ads(fiat, side):
+              attempts = []
+              params = urllib.parse.urlencode({'fiat': fiat, 'asset': 'USDT',
+                                                 'tradeType': side, 'limit': 20})
+              attempts.append(('Binance Agent',
+                  'https://www.binance.com/bapi/c2c/v1/public/c2c/agent/ad-list?' + params, None))
+              attempts.append(('Binance P2P',
+                  'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
+                  {'asset': 'USDT', 'fiat': fiat, 'tradeType': side, 'page': 1,
+                   'rows': 20, 'payTypes': [], 'publisherType': None, 'merchantCheck': False}))
+              for name, url, payload in attempts:
+                  try:
+                      ads = [parse_ad(row) for row in extract_rows(get_json(url, payload))]
+                      ads = [a for a in ads if a]
+                      if ads:
+                          ads.sort(key=lambda a: a['price'], reverse=(side == 'SELL'))
+                          print(f'{fiat}/{side}: {len(ads)} anuncios usando {name}')
+                          return ads[0]
+                      print(f'{fiat}/{side}: {name} no devolvió anuncios interpretables')
+                  except Exception as e:
+                      print(f'{fiat}/{side}: {name} falló: {type(e).__name__}: {e}')
+                  time.sleep(1)
+              return None
+
+          # BUY: comprar USDT pagando ARS. SELL: vender USDT recibiendo BOB.
+          ars = fetch_ads('ARS', 'BUY')
+          bob = fetch_ads('BOB', 'SELL')
+          if ars is not None and bob is not None:
+              record = {'updatedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        'source': 'Anuncios públicos Binance P2P',
+                        'description': 'Mejor precio entre un máximo de 20 anuncios obtenidos por lado',
+                        'ars': ars, 'bob': bob}
+              Path('precios.json').write_text(json.dumps(record, ensure_ascii=False,
+                                                    separators=(',', ':')) + '\n', encoding='utf-8')
+              print('Cotizaciones de ambos mercados actualizadas.')
+          else:
+              print('Datos incompletos: se conserva el último archivo de precios sin alterarlo.')
+          PY
+      - name: Preparar archivos de la web
+        run: |
+          mkdir -p web
+          for f in index.html manifest.webmanifest sw.js icon-192.png icon-512.png precios.json; do
+            if [ -f "$f" ]; then cp "$f" web/; fi
+          done
+          touch web/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./web
+      - id: publicacion
+        uses: actions/deploy-pages@v4
