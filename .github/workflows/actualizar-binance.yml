@@ -17,11 +17,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publicar:
+  preparar:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.publicacion.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Consultar precios públicos de Binance
@@ -133,5 +130,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./web
+  publicar:
+    name: Publicar página y cotizaciones
+    needs: preparar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacion.outputs.page_url }}
+    steps:
       - id: publicacion
         uses: actions/deploy-pages@v4
