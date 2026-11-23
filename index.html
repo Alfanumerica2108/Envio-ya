@@ -32,6 +32,43 @@ button.ghost{background:#242d27;color:#e5eee8}
 .line b{color:#fff}.hidden{display:none}
 .history{border-top:1px solid #29332c;padding:11px 0;font-size:13px}
 footer{padding:8px 2px 24px}
+
+/* ENVÍOS YA — diseño compacto, manteniendo tamaños cómodos para tocar */
+body{padding:8px 10px 18px}
+header{padding:7px 2px 9px}
+h1{font-size:21px}header p{font-size:10px;letter-spacing:.35px}
+.logo{width:37px;height:37px;border-radius:11px;font-size:17px}
+.card{border-radius:14px;padding:11px 12px;margin:8px 0}
+h2{font-size:15px;margin:0 0 8px}
+label{font-size:11px;margin:8px 0 4px}
+input,select{border-radius:9px;padding:9px 10px;font-size:16px;min-height:40px}
+.grid{gap:7px}
+.quote{padding:9px;border-radius:10px}
+.quote small{font-size:10px;line-height:1.25;min-height:25px}
+.quote strong{font-size:18px;margin-top:3px}
+.muted{font-size:10px;line-height:1.4}
+.switch{margin:6px 0;gap:7px}
+button{border-radius:10px;min-height:42px;padding:9px 10px;font-size:13px;margin-top:9px}
+.switch button{min-height:41px}
+#calc{font-size:14px}
+.result{padding:10px;margin-top:9px;border-radius:11px}
+.big{font-size:26px;margin:2px 0 5px}
+.line{padding:4px 0;font-size:12px}
+.history{padding:7px 0;font-size:12px}
+footer{padding:6px 4px 14px}
+.quote-card p.muted{margin:6px 0 0}
+.edit-grid label{font-size:10px;font-weight:650;min-height:24px}
+.edit-grid input{font-size:15px}
+.auto-label{display:flex;align-items:center;gap:8px;color:#e8f5ec;font-size:12px;font-weight:650;margin:0}
+.auto-label input{width:19px;height:19px;min-height:19px;padding:0;margin:0;flex-shrink:0;accent-color:#19804d}
+.binance-card>p.muted{margin:7px 0}
+#binanceStatus{color:#bbd7c5;font-size:10px}
+.extra-details{margin-top:7px}
+.extra-details summary,.compact-history summary{cursor:pointer;color:#b8d2c1;font-size:12px;font-weight:700;padding:7px 1px}
+.compact-history summary{color:#f5f7f5;font-size:14px}
+.compact-history #history{margin-top:6px}
+@media(max-width:360px){h1{font-size:20px}.quote strong{font-size:17px}.card{padding:10px}.edit-grid label{font-size:9.5px}}
+
 </style>
 </head>
 <body>
@@ -39,26 +76,17 @@ footer{padding:8px 2px 24px}
  <div><h1>ENVÍOS YA</h1><p>ARGENTINA 🇦🇷  ⇄  BOLIVIA 🇧🇴</p></div>
  <div class="logo">YA</div>
 </header>
-<section class="card">
+<section class="card quote-card">
  <h2>📊 Cotizaciones</h2>
  <div class="grid">
   <div class="quote"><small>Compra USDT · Argentina</small><strong id="buyLabel">$1.773,99</strong></div>
   <div class="quote"><small>Venta USDT · Bolivia</small><strong id="sellLabel">Bs. 11,99</strong></div>
  </div>
- <label>Precio de compra USDT en Argentina (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99">
- <label>Precio de venta USDT en Bolivia (BOB)</label><input id="sell" type="number" step="0.01" value="11.99">
- <p class="muted">Cotizaciones para calcular envíos. Los precios automáticos solo se aplican si la consulta es reciente y se han obtenido ambos mercados; puedes volver a los manuales.</p>
-</section>
-<section class="card">
- <h2>🔄 Binance P2P</h2>
- <label style="display:flex;align-items:center;gap:10px;color:#e8f5ec;font-size:14px">
-  <input id="autoMode" type="checkbox" checked style="width:20px;height:20px;accent-color:#19804d">
-  Usar cotizaciones automáticas cuando estén disponibles
- </label>
- <p class="muted">Se comprueba al abrir la página y cada 5 minutos mientras esté abierta. Las consultas al mercado las realiza GitHub periódicamente.</p>
- <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
- <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
- <div id="binanceDetails"></div>
+ <div class="grid edit-grid">
+  <div><label for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
+  <div><label for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
+ </div>
+ <p class="muted">Precios editables. Se usan ofertas automáticas solo cuando son recientes.</p>
 </section>
 <section class="card">
  <h2>💸 Calcular envío</h2>
@@ -82,9 +110,20 @@ footer{padding:8px 2px 24px}
   <button id="save">GUARDAR EN HISTORIAL</button>
  </div>
 </section>
-<section class="card">
- <h2>🧾 Historial de envíos</h2><div id="history" class="muted">Todavía no hay operaciones guardadas.</div>
- <button id="clear" class="ghost">Borrar historial</button>
+<section class="card binance-card">
+ <h2>🔄 Binance P2P</h2>
+ <label class="auto-label"><input id="autoMode" type="checkbox" checked>Usar precios automáticos</label>
+ <p class="muted">Se comprueba al abrir y cada 5 minutos. GitHub consulta Binance periódicamente.</p>
+ <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
+ <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
+ <details class="extra-details"><summary>Ver anunciantes y métodos de pago</summary><div id="binanceDetails"></div></details>
+</section>
+<section class="card compact-history">
+ <details>
+  <summary>🧾 Historial de envíos</summary>
+  <div id="history" class="muted">Todavía no hay operaciones guardadas.</div>
+  <button id="clear" class="ghost">Borrar historial</button>
+ </details>
 </section>
 <footer class="muted">Los resultados son estimaciones. Los precios P2P, límites de anuncios, medios de pago y comisiones pueden variar. Verifica cada operación antes de transferir o liberar USDT.</footer>
 <script>
