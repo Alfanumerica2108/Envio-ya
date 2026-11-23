@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080b09">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>ENVÍOS YA</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#080b09;color:#f5f7f5}
+*{box-sizing:border-box}body{margin:0 auto;padding:16px;max-width:560px;background:#080b09}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 2px 18px}
+h1{font-size:25px;letter-spacing:.5px;margin:0;font-weight:850}header p{margin:3px 0 0;color:#9ca79f;font-size:11px;letter-spacing:1px}
+.logo{background:#164b32;border:1px solid #28764d;border-radius:15px;width:48px;height:48px;display:grid;place-items:center;font-size:21px;font-weight:900}
+.card{background:#141916;border:1px solid #252e28;border-radius:18px;padding:16px;margin:12px 0}
+h2{font-size:16px;margin:0 0 12px}
+label{display:block;color:#aab5ad;font-size:12px;font-weight:650;margin:12px 0 6px}
+input,select{width:100%;background:#090e0b;color:#fff;border:1px solid #354139;border-radius:11px;padding:13px;font-size:17px;outline:none}
+input:focus,select:focus{border-color:#36a269}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quote{background:#090e0b;border-radius:12px;padding:12px}.quote small{display:block;color:#9ca79f;font-size:11px}.quote strong{display:block;font-size:19px;margin-top:4px}
+.muted{color:#94a097;font-size:11px;line-height:1.45}
+.switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.switch button{margin:0;background:#252d28;color:#cbd5ce;border:1px solid #38443c}
+button{width:100%;border:0;border-radius:12px;padding:14px;background:#19804d;color:white;font-size:15px;font-weight:800;margin-top:12px}
+button.active{background:#19804d;color:white;border-color:#19804d}
+button.ghost{background:#242d27;color:#e5eee8}
+.result{background:#0c2116;border:1px solid #1e6840;border-radius:14px;padding:14px;margin-top:14px}
+.result small{color:#a9c8b5}.big{font-size:30px;font-weight:850;color:#62d995;margin:4px 0 10px}
+.line{display:flex;justify-content:space-between;gap:10px;padding:6px 0;color:#c2ccc5;font-size:13px}
+.line b{color:#fff}.hidden{display:none}
+.history{border-top:1px solid #29332c;padding:11px 0;font-size:13px}
+footer{padding:8px 2px 24px}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>ENVÍOS YA</h1><p>ARGENTINA 🇦🇷  ⇄  BOLIVIA 🇧🇴</p></div>
+ <div class="logo">YA</div>
+</header>
+<section class="card">
+ <h2>📊 Cotizaciones</h2>
+ <div class="grid">
+  <div class="quote"><small>Compra USDT · Argentina</small><strong id="buyLabel">$1.773,99</strong></div>
+  <div class="quote"><small>Venta USDT · Bolivia</small><strong id="sellLabel">Bs. 11,99</strong></div>
+ </div>
+ <label>Precio de compra USDT en Argentina (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99">
+ <label>Precio de venta USDT en Bolivia (BOB)</label><input id="sell" type="number" step="0.01" value="11.99">
+ <p class="muted">Cotizaciones editables. La actualización automática del mejor anuncio P2P se incorporará cuando validemos una fuente fiable y sus límites de operación.</p>
+</section>
+<section class="card">
+ <h2>💸 Calcular envío</h2>
+ <div class="switch">
+  <button id="arsMode" class="active">ARS → BOB</button>
+  <button id="bobMode" class="ghost">BOB → ARS</button>
+ </div>
+ <label id="amountLabel">Importe que entrega el cliente (ARS)</label>
+ <input id="amount" type="number" inputmode="decimal" placeholder="Ej. 200000">
+ <div class="grid">
+  <div><label>Tipo de comisión</label><select id="feeType"><option value="fixed">Fija</option><option value="percent">Porcentaje</option></select></div>
+  <div><label id="feeLabel">Comisión fija (ARS)</label><input id="fee" type="number" inputmode="decimal" value="0"></div>
+ </div>
+ <button id="calc">CALCULAR ENVÍO</button>
+ <div id="result" class="result hidden">
+  <small id="resultCaption">EL DESTINATARIO RECIBE</small>
+  <div class="big" id="mainResult">Bs. 0,00</div>
+  <div class="line"><span>USDT estimados</span><b id="usdt">0</b></div>
+  <div class="line"><span>Comisión aplicada</span><b id="feeOut">0</b></div>
+  <div class="line"><span>Importe base</span><b id="baseOut">0</b></div>
+  <button id="save">GUARDAR EN HISTORIAL</button>
+ </div>
+</section>
+<section class="card">
+ <h2>🧾 Historial de envíos</h2><div id="history" class="muted">Todavía no hay operaciones guardadas.</div>
+ <button id="clear" class="ghost">Borrar historial</button>
+</section>
+<footer class="muted">Los resultados son estimaciones. Los precios P2P, límites de anuncios, medios de pago y comisiones pueden variar. Verifica cada operación antes de transferir o liberar USDT.</footer>
+<script>
+const $=id=>document.getElementById(id);let mode='ARS',latest=null;
+const money=(n,c)=>new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:2}).format(n);
+function persistQuotes(){localStorage.buy=$('buy').value;localStorage.sell=$('sell').value;updateQuoteLabels()}
+function updateQuoteLabels(){$('buyLabel').textContent=money(Number($('buy').value||0),'ARS');$('sellLabel').textContent='Bs. '+Number($('sell').value||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}
+['buy','sell'].forEach(id=>$(id).addEventListener('change',persistQuotes));
+
+const BINANCE_P2P_URL='https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search';
+const fmtARS=n=>money(n,'ARS');
+const fmtBOB=n=>'Bs. '+Number(n).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+async function fetchP2P(fiat,tradeType){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
+  try{
+    const response=await fetch(BINANCE_P2P_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'*/*'},
+      body:JSON.stringify({asset:'USDT',fiat,tradeType,page:1,rows:20,payTypes:[],publisherType:null,merchantCheck:false}),
+      signal:controller.signal,
+      cache:'no-store'
+    });
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    const json=await response.json();
+    if(!Array.isArray(json.data)||!json.data.length)throw new Error('Binance no devolvió anuncios para '+fiat);
+    const ads=json.data.map(x=>({
+      price:Number(x.adv?.price),
+      methods:(x.adv?.tradeMethods||[]).map(m=>m.tradeMethodName||m.identifier||m.paymentType).filter(Boolean),
+      nick:x.advertiser?.nickName||'Anunciante P2P',
+      min:Number(x.adv?.minSingleTransAmount||0),
+      max:Number(x.adv?.maxSingleTransAmount||0)
+    })).filter(x=>x.price>0);
+    if(!ads.length)throw new Error('No se encontraron precios válidos para '+fiat);
+    ads.sort((a,b)=>tradeType==='BUY'?a.price-b.price:b.price-a.price);
+    return {best:ads[0],ads};
+  }finally{clearTimeout(timer)}
+}
+$('refreshBinance').onclick=async()=>{
+  const btn=$('refreshBinance');
+  btn.disabled=true;btn.textContent='CONSULTANDO BINANCE…';
+  $('binanceStatus').textContent='Consultando anuncios P2P de ARS y BOB…';
+  $('binanceDetails').textContent='';
+  try{
+    const [ars,bob]=await Promise.all([fetchP2P('ARS','BUY'),fetchP2P('BOB','SELL')]);
+    $('buy').value=ars.best.price;
+    $('sell').value=bob.best.price;
+    persistQuotes();
+    const arsMethods=[...new Set(ars.ads.flatMap(a=>a.methods))];
+    const bobMethods=[...new Set(bob.ads.flatMap(a=>a.methods))];
+    const stamp=new Date().toLocaleString('es-AR');
+    $('binanceStatus').textContent='Actualizado desde Binance P2P: '+stamp;
+    $('binanceDetails').innerHTML=
+      '<div class="line"><span>Mejor compra USDT · Argentina</span><b>'+fmtARS(ars.best.price)+'</b></div>'+
+      '<div class="muted">Anunciante: '+escapeHTML(ars.best.nick)+' · Medios en anuncios consultados: '+escapeHTML(arsMethods.join(', ')||'No informados')+'</div>'+
+      '<div class="line"><span>Mejor venta USDT · Bolivia</span><b>'+fmtBOB(bob.best.price)+'</b></div>'+
+      '<div class="muted">Anunciante: '+escapeHTML(bob.best.nick)+' · Medios en anuncios consultados: '+escapeHTML(bobMethods.join(', ')||'No informados')+'</div>';
+  }catch(err){
+    $('binanceStatus').textContent='No se pudo conectar directamente con Binance desde este navegador. Tus cotizaciones manuales siguen disponibles. Detalle: '+(err.name==='AbortError'?'tiempo de espera agotado':err.message);
+  }finally{
+    btn.disabled=false;btn.textContent='ACTUALIZAR PRECIOS DE BINANCE P2P';
+  }
+};
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setMode(m){mode=m;$('arsMode').className=m==='ARS'?'active':'ghost';$('bobMode').className=m==='BOB'?'active':'ghost';$('amountLabel').textContent=m==='ARS'?'Importe que entrega el cliente (ARS)':'Importe que debe recibir en Bolivia (BOB)';$('feeLabel').textContent=$('feeType').value==='fixed'?'Comisión fija ('+(m==='ARS'?'ARS':'BOB')+')':'Comisión (%)';$('result').classList.add('hidden')}
+$('arsMode').onclick=()=>setMode('ARS');$('bobMode').onclick=()=>setMode('BOB');
+$('feeType').onchange=()=>{$('feeLabel').textContent=$('feeType').value==='fixed'?'Comisión fija ('+(mode==='ARS'?'ARS':'BOB')+')':'Comisión (%)'};
+$('calc').onclick=()=>{
+ const a=Number($('amount').value),buy=Number($('buy').value),sell=Number($('sell').value),f=Number($('fee').value||0),type=$('feeType').value;
+ if(!(a>0&&buy>0&&sell>0&&f>=0)){alert('Revisa el importe, las cotizaciones y la comisión.');return}
+ let fee=type==='percent'?a*f/100:f,base,usdt,out,currency;
+ if(mode==='ARS'){if(fee>a){alert('La comisión no puede superar el importe.');return}base=a-fee;usdt=base/buy;out=usdt*sell;currency='BOB'}
+ else {base=a+fee;usdt=base/sell;out=usdt*buy;currency='ARS'}
+ latest={date:new Date().toLocaleString('es-AR'),mode,amount:a,fee,type,buy,sell,base,usdt,out,currency};
+ $('resultCaption').textContent=mode==='ARS'?'EL DESTINATARIO RECIBE':'EL CLIENTE DEBE ENTREGAR';
+ $('mainResult').textContent=currency==='BOB'?'Bs. '+out.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2}):money(out,'ARS');
+ $('usdt').textContent=usdt.toFixed(4);$('feeOut').textContent=type==='percent'?f+'%':(mode==='ARS'?money(fee,'ARS'):'Bs. '+fee.toFixed(2));
+ $('baseOut').textContent=mode==='ARS'?money(base,'ARS'):'Bs. '+base.toFixed(2);
+ $('result').classList.remove('hidden')
+};
+$('save').onclick=()=>{if(!latest)return;let h=JSON.parse(localStorage.history||'[]');h.unshift(latest);localStorage.history=JSON.stringify(h);renderHistory();alert('Envío guardado en este teléfono.')};
+function renderHistory(){let h=JSON.parse(localStorage.history||'[]');$('history').innerHTML=h.length?h.map(x=>`<div class="history"><b>${x.date}</b><div class="line"><span>${x.mode==='ARS'?'ARS → BOB':'BOB → ARS'}</span><b>${x.currency==='BOB'?'Bs. '+x.out.toFixed(2):money(x.out,'ARS')}</b></div></div>`).join(''):'Todavía no hay operaciones guardadas.'}
+$('clear').onclick=()=>{if(confirm('¿Borrar todo el historial?')){localStorage.removeItem('history');renderHistory()}}
+if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();renderHistory();
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
+</script>
+</body></html>
