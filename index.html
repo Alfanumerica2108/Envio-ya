@@ -47,13 +47,17 @@ footer{padding:8px 2px 24px}
  </div>
  <label>Precio de compra USDT en Argentina (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99">
  <label>Precio de venta USDT en Bolivia (BOB)</label><input id="sell" type="number" step="0.01" value="11.99">
- <p class="muted">Cotizaciones editables. La actualización automática del mejor anuncio P2P se incorporará cuando validemos una fuente fiable y sus límites de operación.</p>
+ <p class="muted">Cotizaciones para calcular envíos. Los precios automáticos solo se aplican si la consulta es reciente y se han obtenido ambos mercados; puedes volver a los manuales.</p>
 </section>
 <section class="card">
  <h2>🔄 Binance P2P</h2>
- <p class="muted">Consulta los anuncios públicos para actualizar las cotizaciones. Se mostrarán los mejores precios encontrados; si Binance bloquea la consulta, podrás seguir usando los precios manuales.</p>
- <button id="refreshBinance" type="button">ACTUALIZAR PRECIOS DE BINANCE P2P</button>
- <p id="binanceStatus" class="muted" aria-live="polite">Todavía no se ha realizado una consulta.</p>
+ <label style="display:flex;align-items:center;gap:10px;color:#e8f5ec;font-size:14px">
+  <input id="autoMode" type="checkbox" checked style="width:20px;height:20px;accent-color:#19804d">
+  Usar cotizaciones automáticas cuando estén disponibles
+ </label>
+ <p class="muted">Se comprueba al abrir la página y cada 5 minutos mientras esté abierta. Las consultas al mercado las realiza GitHub periódicamente.</p>
+ <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
+ <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
  <div id="binanceDetails"></div>
 </section>
 <section class="card">
@@ -110,57 +114,78 @@ function renderHistory(){let h=JSON.parse(localStorage.history||'[]');$('history
 $('clear').onclick=()=>{if(confirm('¿Borrar todo el historial?')){localStorage.removeItem('history');renderHistory()}}
 if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();renderHistory();
 
-// Consulta pública de anuncios P2P de Binance. No requiere API key.
-function getAdPrice(ad){
-  const raw = ad?.adv?.price ?? ad?.price ?? ad?.adv?.priceRate ?? ad?.priceRate;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
+// El navegador consulta precios.json publicado por GitHub Pages, no Binance directamente.
+const manualQuotes = {
+  buy: Number(localStorage.getItem('manualBuy') || localStorage.buy || $('buy').value),
+  sell: Number(localStorage.getItem('manualSell') || localStorage.sell || $('sell').value)
+};
+const formatP2pPrice=(n,c)=>c==='ARS'?money(n,'ARS'):'Bs. '+n.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+let lastGoodRates=null;
+const auto=$('autoMode');
+auto.checked=localStorage.getItem('autoMode')!=='false';
+function restoreManual(){
+  $('buy').value=manualQuotes.buy; $('sell').value=manualQuotes.sell;
+  updateQuoteLabels();
 }
-function getAdMethods(ad){
-  const list = ad?.adv?.tradeMethods ?? ad?.tradeMethods ?? ad?.adv?.payTypes ?? [];
-  return Array.isArray(list) ? list.map(x => x.tradeMethodName || x.identifier || x.name || x).filter(Boolean).join(', ') : '';
+// Los cambios del usuario desactivan el modo automático para respetar su precio manual.
+for(const id of ['buy','sell']){
+  $(id).addEventListener('input',()=>{
+    auto.checked=false;localStorage.setItem('autoMode','false');
+    const val=Number($(id).value);
+    if(val>0){manualQuotes[id==='buy'?'buy':'sell']=val;localStorage.setItem(id==='buy'?'manualBuy':'manualSell',String(val));}
+  });
 }
-function getMerchant(ad){
-  return ad?.advertiser?.nickName || ad?.user?.nickName || ad?.adv?.nickName || ad?.nickName || 'Anunciante P2P';
+auto.addEventListener('change',()=>{
+  localStorage.setItem('autoMode',String(auto.checked));
+  if(auto.checked && lastGoodRates){applyRates(lastGoodRates)}
+  else {restoreManual()}
+  showRatesState(lastGoodRates);
+});
+function applyRates(rates){
+  if(!auto.checked || !rates) return;
+  $('buy').value=rates.ars.price;$('sell').value=rates.bob.price;
+  updateQuoteLabels();
 }
-async function fetchP2P(fiat, tradeType){
-  const url = new URL('https://www.binance.com/bapi/c2c/v1/public/c2c/agent/ad-list');
-  url.searchParams.set('fiat', fiat);
-  url.searchParams.set('asset', 'USDT');
-  url.searchParams.set('tradeType', tradeType);
-  url.searchParams.set('limit', '20');
-  const response = await fetch(url.toString(), {method:'GET', headers:{'Accept':'application/json'}});
-  if(!response.ok) throw new Error('Binance respondió HTTP '+response.status);
-  const json = await response.json();
-  const rows = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.data?.list) ? json.data.list : (Array.isArray(json?.data?.ads) ? json.data.ads : (Array.isArray(json?.data?.advList) ? json.data.advList : [])));
-  const ads = rows.map(ad => ({price:getAdPrice(ad), merchant:getMerchant(ad), methods:getAdMethods(ad)})).filter(x => x.price);
-  if(!ads.length) throw new Error('Binance no devolvió anuncios para '+fiat);
-  ads.sort((a,b)=>tradeType==='BUY'?a.price-b.price:b.price-a.price);
-  return ads;
-}
-function showAdDetails(title, ad, fiat){
-  const methods = ad.methods ? ' · '+ad.methods : '';
-  const value = fiat==='ARS' ? money(ad.price,'ARS') : 'Bs. '+ad.price.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
-  return `<div class="history"><b>${title}: ${value}</b><div>${ad.merchant}${methods}</div></div>`;
+function showRatesState(rates, error){
+  const status=$('binanceStatus'),details=$('binanceDetails');
+  if(!rates){
+    status.textContent=error || 'No hay datos recientes verificables. Se mantienen tus precios manuales.';
+    details.textContent='';return;
+  }
+  const when=new Date(rates.updatedAt).toLocaleString('es-AR');
+  status.textContent='Binance P2P · consultado: '+when+'. '+(auto.checked?'Cotizaciones automáticas aplicadas.':'Modo manual activo.');
+  details.textContent='';
+  for(const [label,fiat,ad] of [['Compra USDT en Argentina','ARS',rates.ars],['Venta USDT en Bolivia','BOB',rates.bob]]){
+    const line=document.createElement('div');line.className='history';
+    const name=document.createElement('b');name.textContent=label+': '+formatP2pPrice(ad.price,fiat);
+    const desc=document.createElement('div');desc.className='muted';
+    desc.textContent=(ad.merchant||'Anunciante')+(ad.methods?' · '+ad.methods:'')+' · Mejor precio de hasta 20 anuncios consultados';
+    line.append(name,desc);details.append(line);
+  }
 }
 async function refreshBinance(){
-  const btn=$('refreshBinance'), status=$('binanceStatus'), details=$('binanceDetails');
-  btn.disabled=true; btn.textContent='CONSULTANDO BINANCE…';
-  status.textContent='Buscando anuncios P2P de compra en Argentina y venta en Bolivia…';
-  details.innerHTML='';
+  const btn=$('refreshBinance'),status=$('binanceStatus');
+  btn.disabled=true;btn.textContent='COMPROBANDO...';
   try{
-    const [ars,bob]=await Promise.all([fetchP2P('ARS','BUY'),fetchP2P('BOB','SELL')]);
-    $('buy').value=ars[0].price; $('sell').value=bob[0].price;
-    persistQuotes();
-    details.innerHTML=showAdDetails('Mejor compra USDT · Argentina',ars[0],'ARS')+showAdDetails('Mejor venta USDT · Bolivia',bob[0],'BOB');
-    status.textContent='Actualizado desde Binance P2P: '+new Date().toLocaleString('es-AR')+'. Se consultaron anuncios sin limitar medios de pago.';
-  }catch(err){
-    status.textContent='No se pudo consultar Binance desde este navegador. Puede ser un bloqueo de acceso/CORS o falta de anuncios. Conservamos tus precios manuales. Detalle: '+err.message;
+    const response=await fetch('./precios.json?t='+Date.now(),{cache:'no-store'});
+    if(!response.ok)throw new Error('Todavía no existe un archivo de cotizaciones publicado.');
+    const rates=await response.json();
+    const age=Date.now()-Date.parse(rates.updatedAt);
+    if(!(age>=0 && age<30*60*1000 && Number(rates.ars?.price)>0 && Number(rates.bob?.price)>0))
+      throw new Error('La última cotización no es reciente o está incompleta.');
+    lastGoodRates=rates;
+    applyRates(rates);showRatesState(rates);
+  }catch(e){
+    lastGoodRates=null;
+    restoreManual();
+    showRatesState(null,'No se han podido obtener cotizaciones recientes de ambos mercados. '+e.message+' Se mantienen los precios manuales.');
   }finally{
-    btn.disabled=false; btn.textContent='ACTUALIZAR PRECIOS DE BINANCE P2P';
+    btn.disabled=false;btn.textContent='COMPROBAR COTIZACIONES';
   }
 }
 $('refreshBinance').onclick=refreshBinance;
+refreshBinance();
+setInterval(refreshBinance,5*60*1000);
 
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
 </script>
