@@ -50,6 +50,13 @@ footer{padding:8px 2px 24px}
  <p class="muted">Cotizaciones editables. La actualización automática del mejor anuncio P2P se incorporará cuando validemos una fuente fiable y sus límites de operación.</p>
 </section>
 <section class="card">
+ <h2>🔄 Binance P2P</h2>
+ <p class="muted">Consulta los anuncios públicos para actualizar las cotizaciones. Se mostrarán los mejores precios encontrados; si Binance bloquea la consulta, podrás seguir usando los precios manuales.</p>
+ <button id="refreshBinance" type="button">ACTUALIZAR PRECIOS DE BINANCE P2P</button>
+ <p id="binanceStatus" class="muted" aria-live="polite">Todavía no se ha realizado una consulta.</p>
+ <div id="binanceDetails"></div>
+</section>
+<section class="card">
  <h2>💸 Calcular envío</h2>
  <div class="switch">
   <button id="arsMode" class="active">ARS → BOB</button>
@@ -102,6 +109,59 @@ $('save').onclick=()=>{if(!latest)return;let h=JSON.parse(localStorage.history||
 function renderHistory(){let h=JSON.parse(localStorage.history||'[]');$('history').innerHTML=h.length?h.map(x=>`<div class="history"><b>${x.date}</b><div class="line"><span>${x.mode==='ARS'?'ARS → BOB':'BOB → ARS'}</span><b>${x.currency==='BOB'?'Bs. '+x.out.toFixed(2):money(x.out,'ARS')}</b></div></div>`).join(''):'Todavía no hay operaciones guardadas.'}
 $('clear').onclick=()=>{if(confirm('¿Borrar todo el historial?')){localStorage.removeItem('history');renderHistory()}}
 if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();renderHistory();
+
+// Consulta pública de anuncios P2P de Binance. No requiere API key.
+function getAdPrice(ad){
+  const raw = ad?.adv?.price ?? ad?.price ?? ad?.adv?.priceRate ?? ad?.priceRate;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function getAdMethods(ad){
+  const list = ad?.adv?.tradeMethods ?? ad?.tradeMethods ?? ad?.adv?.payTypes ?? [];
+  return Array.isArray(list) ? list.map(x => x.tradeMethodName || x.identifier || x.name || x).filter(Boolean).join(', ') : '';
+}
+function getMerchant(ad){
+  return ad?.advertiser?.nickName || ad?.user?.nickName || ad?.adv?.nickName || ad?.nickName || 'Anunciante P2P';
+}
+async function fetchP2P(fiat, tradeType){
+  const url = new URL('https://www.binance.com/bapi/c2c/v1/public/c2c/agent/ad-list');
+  url.searchParams.set('fiat', fiat);
+  url.searchParams.set('asset', 'USDT');
+  url.searchParams.set('tradeType', tradeType);
+  url.searchParams.set('limit', '20');
+  const response = await fetch(url.toString(), {method:'GET', headers:{'Accept':'application/json'}});
+  if(!response.ok) throw new Error('Binance respondió HTTP '+response.status);
+  const json = await response.json();
+  const rows = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.data?.list) ? json.data.list : (Array.isArray(json?.data?.ads) ? json.data.ads : (Array.isArray(json?.data?.advList) ? json.data.advList : [])));
+  const ads = rows.map(ad => ({price:getAdPrice(ad), merchant:getMerchant(ad), methods:getAdMethods(ad)})).filter(x => x.price);
+  if(!ads.length) throw new Error('Binance no devolvió anuncios para '+fiat);
+  ads.sort((a,b)=>tradeType==='BUY'?a.price-b.price:b.price-a.price);
+  return ads;
+}
+function showAdDetails(title, ad, fiat){
+  const methods = ad.methods ? ' · '+ad.methods : '';
+  const value = fiat==='ARS' ? money(ad.price,'ARS') : 'Bs. '+ad.price.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return `<div class="history"><b>${title}: ${value}</b><div>${ad.merchant}${methods}</div></div>`;
+}
+async function refreshBinance(){
+  const btn=$('refreshBinance'), status=$('binanceStatus'), details=$('binanceDetails');
+  btn.disabled=true; btn.textContent='CONSULTANDO BINANCE…';
+  status.textContent='Buscando anuncios P2P de compra en Argentina y venta en Bolivia…';
+  details.innerHTML='';
+  try{
+    const [ars,bob]=await Promise.all([fetchP2P('ARS','BUY'),fetchP2P('BOB','SELL')]);
+    $('buy').value=ars[0].price; $('sell').value=bob[0].price;
+    persistQuotes();
+    details.innerHTML=showAdDetails('Mejor compra USDT · Argentina',ars[0],'ARS')+showAdDetails('Mejor venta USDT · Bolivia',bob[0],'BOB');
+    status.textContent='Actualizado desde Binance P2P: '+new Date().toLocaleString('es-AR')+'. Se consultaron anuncios sin limitar medios de pago.';
+  }catch(err){
+    status.textContent='No se pudo consultar Binance desde este navegador. Puede ser un bloqueo de acceso/CORS o falta de anuncios. Conservamos tus precios manuales. Detalle: '+err.message;
+  }finally{
+    btn.disabled=false; btn.textContent='ACTUALIZAR PRECIOS DE BINANCE P2P';
+  }
+}
+$('refreshBinance').onclick=refreshBinance;
+
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
 </script>
 </body></html>
