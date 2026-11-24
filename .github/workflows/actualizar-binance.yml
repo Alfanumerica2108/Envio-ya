@@ -113,15 +113,19 @@ jobs:
 
           # BUY: comprar USDT pagando ARS. SELL: vender USDT recibiendo BOB.
           ars = fetch_ads('ARS', 'BUY')
+          ars_sell = fetch_ads('ARS', 'SELL')
+          bob_buy = fetch_ads('BOB', 'BUY')
           bob = fetch_ads('BOB', 'SELL')
           if ars is not None and bob is not None:
               record = {'updatedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         'source': 'Anuncios públicos Binance P2P',
-                        'description': 'Mediana de hasta 20 anuncios obtenidos por lado',
-                        'ars': ars, 'bob': bob}
+                        'description': 'Mediana de hasta 20 anuncios por cada lado; compra ARS y venta BOB para calcular',
+                        'ars': ars, 'bob': bob,
+                        'arsBuy': ars, 'arsSell': ars_sell,
+                        'bobBuy': bob_buy, 'bobSell': bob}
               Path('precios.json').write_text(json.dumps(record, ensure_ascii=False,
                                                     separators=(',', ':')) + '\n', encoding='utf-8')
-              print('Cotizaciones de ambos mercados actualizadas con precios habituales (mediana).')
+              print('Cotizaciones actualizadas; ARS/BUY, ARS/SELL, BOB/BUY, BOB/SELL (medianas).')
           else:
               print('Datos incompletos: se conserva el último archivo de precios sin alterarlo.')
 
