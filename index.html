@@ -86,7 +86,7 @@ footer{padding:6px 4px 14px}
   <div><label for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
   <div><label for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
  </div>
- <p class="muted">Precios editables. Se usan ofertas automáticas solo cuando son recientes.</p>
+ <p class="muted">Precios editables. Si no hay datos nuevos, se conserva la última cotización y se indica su fecha.</p>
 </section>
 <section class="card">
  <h2>💸 Calcular envío</h2>
@@ -113,7 +113,7 @@ footer{padding:6px 4px 14px}
 <section class="card binance-card">
  <h2>🔄 Binance P2P</h2>
  <label class="auto-label"><input id="autoMode" type="checkbox" checked>Usar precios automáticos</label>
- <p class="muted">Se comprueba al abrir y cada 5 minutos. GitHub consulta Binance periódicamente.</p>
+ <p class="muted">Comprueba los precios al abrir y al volver a la app. GitHub consulta Binance periódicamente.</p>
  <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
  <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
  <details class="extra-details"><summary>Ver anunciantes y métodos de pago</summary><div id="binanceDetails"></div></details>
@@ -153,17 +153,33 @@ function renderHistory(){let h=JSON.parse(localStorage.history||'[]');$('history
 $('clear').onclick=()=>{if(confirm('¿Borrar todo el historial?')){localStorage.removeItem('history');renderHistory()}}
 if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();renderHistory();
 
-// El navegador consulta precios.json publicado por GitHub Pages, no Binance directamente.
+// Los precios vienen de precios.json publicado por GitHub Pages, no de Binance directamente.
 const manualQuotes = {
   buy: Number(localStorage.getItem('manualBuy') || localStorage.buy || $('buy').value),
   sell: Number(localStorage.getItem('manualSell') || localStorage.sell || $('sell').value)
 };
 const formatP2pPrice=(n,c)=>c==='ARS'?money(n,'ARS'):'Bs. '+n.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
-let lastGoodRates=null;
+const LAST_RATES_KEY='lastBinanceRates_v1';
+const RECENT_MS=30*60*1000;
+const isValidRates=r=>{
+  if(!r || typeof r!=='object')return false;
+  const t=Date.parse(r.updatedAt);
+  return Number.isFinite(t) && t>0 && t<=Date.now()+5*60*1000 &&
+    Number.isFinite(Number(r.ars?.price)) && Number(r.ars.price)>0 &&
+    Number.isFinite(Number(r.bob?.price)) && Number(r.bob.price)>0;
+};
+function loadLastRates(){
+  try{
+    const r=JSON.parse(localStorage.getItem(LAST_RATES_KEY)||'null');
+    return isValidRates(r)?r:null;
+  }catch(e){return null}
+}
+let lastGoodRates=loadLastRates();
+let isRefreshing=false;
 const auto=$('autoMode');
 auto.checked=localStorage.getItem('autoMode')!=='false';
 function restoreManual(){
-  $('buy').value=manualQuotes.buy; $('sell').value=manualQuotes.sell;
+  $('buy').value=manualQuotes.buy;$('sell').value=manualQuotes.sell;
   updateQuoteLabels();
 }
 // Los cambios del usuario desactivan el modo automático para respetar su precio manual.
@@ -176,23 +192,30 @@ for(const id of ['buy','sell']){
 }
 auto.addEventListener('change',()=>{
   localStorage.setItem('autoMode',String(auto.checked));
-  if(auto.checked && lastGoodRates){applyRates(lastGoodRates)}
-  else {restoreManual()}
+  if(auto.checked && lastGoodRates)applyRates(lastGoodRates);
+  else restoreManual();
   showRatesState(lastGoodRates);
 });
 function applyRates(rates){
-  if(!auto.checked || !rates) return;
+  if(!auto.checked || !rates)return;
   $('buy').value=rates.ars.price;$('sell').value=rates.bob.price;
   updateQuoteLabels();
 }
-function showRatesState(rates, error){
+function showRatesState(rates, error=''){
   const status=$('binanceStatus'),details=$('binanceDetails');
   if(!rates){
-    status.textContent=error || 'No hay datos recientes verificables. Se mantienen tus precios manuales.';
+    status.textContent='Sin cotizaciones de Binance guardadas. '+(error || 'Se mantienen los precios manuales.');
     details.textContent='';return;
   }
-  const when=new Date(rates.updatedAt).toLocaleString('es-AR');
-  status.textContent='Binance P2P · consultado: '+when+'. '+(auto.checked?'Cotizaciones automáticas aplicadas.':'Modo manual activo.');
+  const date=new Date(rates.updatedAt);
+  const minutes=Math.max(0,Math.floor((Date.now()-date.getTime())/60000));
+  const recent=minutes<30;
+  const when=date.toLocaleString('es-AR');
+  const timeText=minutes<60?`hace ${minutes} min`:`hace ${Math.floor(minutes/60)} h`;
+  const priceState=recent?'Cotización reciente.':'Cotización anterior: puede haber cambiado.';
+  const selected=auto.checked?'Se usa este último precio.':'Modo manual activo.';
+  status.textContent=`Binance P2P · última consulta: ${when} (${timeText}). ${priceState} ${selected}`+
+    (error?` No se pudo obtener una nueva cotización: ${error}`:'');
   details.textContent='';
   for(const [label,fiat,ad] of [['Compra USDT en Argentina','ARS',rates.ars],['Venta USDT en Bolivia','BOB',rates.bob]]){
     const line=document.createElement('div');line.className='history';
@@ -203,27 +226,38 @@ function showRatesState(rates, error){
   }
 }
 async function refreshBinance(){
-  const btn=$('refreshBinance'),status=$('binanceStatus');
+  if(isRefreshing)return;
+  isRefreshing=true;
+  const btn=$('refreshBinance');
   btn.disabled=true;btn.textContent='COMPROBANDO...';
   try{
     const response=await fetch('./precios.json?t='+Date.now(),{cache:'no-store'});
-    if(!response.ok)throw new Error('Todavía no existe un archivo de cotizaciones publicado.');
+    if(!response.ok)throw new Error('No hay un archivo de precios disponible.');
     const rates=await response.json();
-    const age=Date.now()-Date.parse(rates.updatedAt);
-    if(!(age>=0 && age<30*60*1000 && Number(rates.ars?.price)>0 && Number(rates.bob?.price)>0))
-      throw new Error('La última cotización no es reciente o está incompleta.');
-    lastGoodRates=rates;
-    applyRates(rates);showRatesState(rates);
+    if(!isValidRates(rates))throw new Error('Los datos publicados están incompletos.');
+    // Nunca sustituir una cotización más nueva por una más antigua.
+    if(!lastGoodRates || Date.parse(rates.updatedAt)>=Date.parse(lastGoodRates.updatedAt)){
+      lastGoodRates=rates;
+      localStorage.setItem(LAST_RATES_KEY,JSON.stringify(rates));
+    }
+    applyRates(lastGoodRates);
+    showRatesState(lastGoodRates);
   }catch(e){
-    lastGoodRates=null;
-    restoreManual();
-    showRatesState(null,'No se han podido obtener cotizaciones recientes de ambos mercados. '+e.message+' Se mantienen los precios manuales.');
+    // Conservar el último precio consultado en lugar de volver a $1.774.
+    if(lastGoodRates){applyRates(lastGoodRates);showRatesState(lastGoodRates,e.message)}
+    else {restoreManual();showRatesState(null,e.message)}
   }finally{
     btn.disabled=false;btn.textContent='COMPROBAR COTIZACIONES';
+    isRefreshing=false;
   }
 }
 $('refreshBinance').onclick=refreshBinance;
+// Mostrar inmediatamente el último precio guardado mientras se busca uno más reciente.
+if(lastGoodRates){applyRates(lastGoodRates);showRatesState(lastGoodRates)}
 refreshBinance();
+// Verificar de nuevo al regresar a la app instalada (no solo en un arranque nuevo).
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshBinance()});
+window.addEventListener('pageshow',e=>{if(e.persisted)refreshBinance()});
 setInterval(refreshBinance,5*60*1000);
 
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
