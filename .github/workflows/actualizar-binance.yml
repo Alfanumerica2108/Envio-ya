@@ -96,9 +96,15 @@ jobs:
                       ads = [parse_ad(row) for row in extract_rows(get_json(url, payload))]
                       ads = [a for a in ads if a]
                       if ads:
-                          ads.sort(key=lambda a: a['price'], reverse=(side == 'SELL'))
-                          print(f'{fiat}/{side}: {len(ads)} anuncios usando {name}')
-                          return ads[0]
+                          prices = sorted(a['price'] for a in ads)
+                          mid = len(prices) // 2
+                          # Mediana: el precio central; las ofertas extremas no dominan el cálculo.
+                          typical = prices[mid] if len(prices) % 2 else (prices[mid - 1] + prices[mid]) / 2
+                          print(f'{fiat}/{side}: {len(ads)} anuncios con {name}; mediana {typical:.4f}')
+                          return {'price': round(typical, 4),
+                                  'merchant': 'Precio habitual de mercado',
+                                  'methods': 'Varios anunciantes y métodos de pago',
+                                  'method': 'median', 'adCount': len(ads)}
                       print(f'{fiat}/{side}: {name} no devolvió anuncios interpretables')
                   except Exception as e:
                       print(f'{fiat}/{side}: {name} falló: {type(e).__name__}: {e}')
@@ -111,18 +117,38 @@ jobs:
           if ars is not None and bob is not None:
               record = {'updatedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         'source': 'Anuncios públicos Binance P2P',
-                        'description': 'Mejor precio entre un máximo de 20 anuncios obtenidos por lado',
+                        'description': 'Mediana de hasta 20 anuncios obtenidos por lado',
                         'ars': ars, 'bob': bob}
               Path('precios.json').write_text(json.dumps(record, ensure_ascii=False,
                                                     separators=(',', ':')) + '\n', encoding='utf-8')
-              print('Cotizaciones de ambos mercados actualizadas.')
+              print('Cotizaciones de ambos mercados actualizadas con precios habituales (mediana).')
           else:
               print('Datos incompletos: se conserva el último archivo de precios sin alterarlo.')
+
+          # Dólar blue: indicador independiente, solo para mostrar, sin participar en ningún cálculo.
+          try:
+              blue = get_json('https://dolarapi.com/v1/dolares/blue')
+              compra = float(blue.get('compra') or 0)
+              venta = float(blue.get('venta') or 0)
+              if not (0 < compra <= venta < 10000000):
+                  raise ValueError('Precio blue ausente o inválido')
+              actualizacion = blue.get('fechaActualizacion')
+              if not isinstance(actualizacion, str) or len(actualizacion) < 10:
+                  raise ValueError('La fuente no incluye fecha de actualización')
+              record_blue = {'compra': compra, 'venta': venta,
+                             'updatedAt': actualizacion,
+                             'source': 'DolarAPI', 'informativo': True}
+              Path('dolar-blue.json').write_text(
+                  json.dumps(record_blue, ensure_ascii=False, separators=(',', ':')) + '\n',
+                  encoding='utf-8')
+              print(f'Dólar blue informativo obtenido de DolarAPI: compra {compra}; venta {venta}')
+          except Exception as e:
+              print(f'Dólar blue no disponible: {type(e).__name__}: {e}')
           PY
       - name: Preparar archivos de la web
         run: |
           mkdir -p web
-          for f in index.html manifest.webmanifest sw.js icon-192.png icon-512.png precios.json; do
+          for f in index.html manifest.webmanifest sw.js icon-192.png icon-512.png precios.json dolar-blue.json; do
             if [ -f "$f" ]; then cp "$f" web/; fi
           done
           touch web/.nojekyll
