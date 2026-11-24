@@ -69,6 +69,12 @@ footer{padding:6px 4px 14px}
 .compact-history #history{margin-top:6px}
 @media(max-width:360px){h1{font-size:20px}.quote strong{font-size:17px}.card{padding:10px}.edit-grid label{font-size:9.5px}}
 
+
+.blue-card h2{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px}
+.blue-subtitle{font-size:10px;font-weight:500;color:#a5b6ac}
+.blue-card .quote small{min-height:0}
+.blue-card .quote strong{font-size:18px}
+.blue-card p.muted{margin:7px 0 0}
 </style>
 </head>
 <body>
@@ -117,6 +123,15 @@ footer{padding:6px 4px 14px}
  <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
  <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
  <details class="extra-details"><summary>Ver anunciantes y métodos de pago</summary><div id="binanceDetails"></div></details>
+</section>
+<section class="card blue-card" aria-label="Dólar blue, solo de referencia">
+ <h2>💵 Dólar blue <span class="blue-subtitle">Solo para consultar</span></h2>
+ <div class="grid">
+  <div class="quote"><small>Compra</small><strong id="blueBuy">—</strong></div>
+  <div class="quote"><small>Venta</small><strong id="blueSell">—</strong></div>
+ </div>
+ <p id="blueStatus" class="muted" aria-live="polite">Consultando cotización informativa…</p>
+ <p class="muted">Fuente: DolarAPI. No se usa para calcular envíos.</p>
 </section>
 <section class="card compact-history">
  <details>
@@ -221,7 +236,7 @@ function showRatesState(rates, error=''){
     const line=document.createElement('div');line.className='history';
     const name=document.createElement('b');name.textContent=label+': '+formatP2pPrice(ad.price,fiat);
     const desc=document.createElement('div');desc.className='muted';
-    desc.textContent=(ad.merchant||'Anunciante')+(ad.methods?' · '+ad.methods:'')+' · Mejor precio de hasta 20 anuncios consultados';
+    desc.textContent=ad.method==='median'?('Mediana de '+(ad.adCount||'hasta 20')+' anuncios consultados · referencia, no oferta garantizada'):((ad.merchant||'Anunciante')+(ad.methods?' · '+ad.methods:'')+' · Precio de anuncio');
     line.append(name,desc);details.append(line);
   }
 }
@@ -251,7 +266,7 @@ async function refreshBinance(){
     isRefreshing=false;
   }
 }
-$('refreshBinance').onclick=refreshBinance;
+$('refreshBinance').onclick=()=>{refreshBinance();refreshBlue()};
 // Mostrar inmediatamente el último precio guardado mientras se busca uno más reciente.
 if(lastGoodRates){applyRates(lastGoodRates);showRatesState(lastGoodRates)}
 refreshBinance();
@@ -259,6 +274,50 @@ refreshBinance();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshBinance()});
 window.addEventListener('pageshow',e=>{if(e.persisted)refreshBinance()});
 setInterval(refreshBinance,5*60*1000);
+
+
+// Dólar blue: datos informativos solamente. NO modificar buy/sell ni los cálculos P2P.
+const LAST_BLUE_KEY='lastDolarBlue_v1';
+const validBlue=b=>!!b && Number.isFinite(Number(b.compra)) && Number(b.compra)>0 &&
+  Number.isFinite(Number(b.venta)) && Number(b.venta)>=Number(b.compra) &&
+  Number.isFinite(Date.parse(b.updatedAt)) && Date.parse(b.updatedAt)<=Date.now()+5*60*1000;
+let lastBlue=null;
+try{const cachedBlue=JSON.parse(localStorage.getItem(LAST_BLUE_KEY)||'null');if(validBlue(cachedBlue))lastBlue=cachedBlue}catch(_e){}
+let blueRefreshing=false;
+function showBlue(b,err=''){
+  if(!b){
+    $('blueBuy').textContent='—'; $('blueSell').textContent='—';
+    $('blueStatus').textContent='Sin cotización disponible. '+(err||''); return;
+  }
+  $('blueBuy').textContent=money(Number(b.compra),'ARS');
+  $('blueSell').textContent=money(Number(b.venta),'ARS');
+  const updated=new Date(b.updatedAt);
+  const age=Date.now()-updated.getTime();
+  const old=age>60*60*1000;
+  $('blueStatus').textContent='Fuente: DolarAPI · '+updated.toLocaleString('es-AR')+
+    (old?' · Cotización anterior, puede haber cambiado.':' · Última referencia publicada.')+
+    (err?' No se pudo consultar una nueva: '+err:'');
+}
+async function refreshBlue(){
+  if(blueRefreshing)return;
+  blueRefreshing=true;
+  try{
+    const r=await fetch('./dolar-blue.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw new Error('No disponible.');
+    const b=await r.json();
+    if(!validBlue(b))throw new Error('Datos inválidos.');
+    if(!lastBlue || Date.parse(b.updatedAt)>=Date.parse(lastBlue.updatedAt)){
+      lastBlue=b;
+      localStorage.setItem(LAST_BLUE_KEY,JSON.stringify(b));
+    }
+    showBlue(lastBlue);
+  }catch(e){showBlue(lastBlue,e.message)}finally{blueRefreshing=false}
+}
+if(lastBlue)showBlue(lastBlue);
+refreshBlue();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshBlue()});
+window.addEventListener('pageshow',event=>{if(event.persisted)refreshBlue()});
+setInterval(refreshBlue,5*60*1000);
 
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
 </script>
