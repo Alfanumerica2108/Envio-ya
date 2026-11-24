@@ -75,6 +75,18 @@ footer{padding:6px 4px 14px}
 .blue-card .quote small{min-height:0}
 .blue-card .quote strong{font-size:18px}
 .blue-card p.muted{margin:7px 0 0}
+
+/* Consulta independiente de compra y venta para cada país */
+.country-quotes{align-items:stretch}
+.country-quote{padding:11px 9px 10px;border:1px solid #293d33;background:linear-gradient(160deg,#102319,#0b130e);min-width:0}
+.country-name{font-size:12px;font-weight:750;color:#ebf4ee;white-space:nowrap;margin-bottom:8px}
+.quote-toggle{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;background:#080d0a;border:1px solid #2f4939;border-radius:9px}
+.quote-toggle button{width:100%;padding:8px 0;min-height:33px;margin:0;border:0;border-radius:7px;font-size:11px;font-weight:750;color:#a9c5b3;background:transparent}
+.quote-toggle button.selected{background:#1a8050;color:#fff;box-shadow:0 2px 7px #0005}
+.country-quote strong{display:block;font-size:clamp(16px,4vw,24px);letter-spacing:-.45px;white-space:nowrap;margin:12px 0 1px;font-variant-numeric:tabular-nums}
+.country-quote small{min-height:0!important;font-size:10px;color:#90ac9d}
+.quote-card .edit-grid{margin-top:5px}
+.quote-card .muted{font-size:10px;margin-bottom:0}
 </style>
 </head>
 <body>
@@ -84,15 +96,29 @@ footer{padding:6px 4px 14px}
 </header>
 <section class="card quote-card">
  <h2>📊 Cotizaciones</h2>
- <div class="grid">
-  <div class="quote"><small>Compra USDT · Argentina</small><strong id="buyLabel">$1.773,99</strong></div>
-  <div class="quote"><small>Venta USDT · Bolivia</small><strong id="sellLabel">Bs. 11,99</strong></div>
+ <div class="grid country-quotes">
+  <div class="quote country-quote">
+   <div class="country-name">🇦🇷 Argentina</div>
+   <div class="quote-toggle" role="group" aria-label="Cotización USDT Argentina">
+    <button type="button" class="selected" id="arsBuyView" aria-pressed="true">Compra</button>
+    <button type="button" id="arsSellView" aria-pressed="false">Venta</button>
+   </div>
+   <strong id="buyLabel">$1.773,99</strong><small>USDT · ARS</small>
+  </div>
+  <div class="quote country-quote">
+   <div class="country-name">🇧🇴 Bolivia</div>
+   <div class="quote-toggle" role="group" aria-label="Cotización USDT Bolivia">
+    <button type="button" id="bobBuyView" aria-pressed="false">Compra</button>
+    <button type="button" class="selected" id="bobSellView" aria-pressed="true">Venta</button>
+   </div>
+   <strong id="sellLabel">Bs. 11,99</strong><small>USDT · BOB</small>
+  </div>
  </div>
  <div class="grid edit-grid">
   <div><label for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
   <div><label for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
  </div>
- <p class="muted">Precios editables. Si no hay datos nuevos, se conserva la última cotización y se indica su fecha.</p>
+ <p class="muted">Compra ARS y venta BOB se usan para calcular. Los selectores superiores solo permiten consultar.</p>
 </section>
 <section class="card">
  <h2>💸 Calcular envío</h2>
@@ -119,7 +145,7 @@ footer{padding:6px 4px 14px}
 <section class="card binance-card">
  <h2>🔄 Binance P2P</h2>
  <label class="auto-label"><input id="autoMode" type="checkbox" checked>Usar precios automáticos</label>
- <p class="muted">Comprueba los precios al abrir y al volver a la app. GitHub consulta Binance periódicamente.</p>
+
  <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
  <p id="binanceStatus" class="muted" aria-live="polite">Comprobando la información publicada...</p>
  <details class="extra-details"><summary>Ver anunciantes y métodos de pago</summary><div id="binanceDetails"></div></details>
@@ -131,7 +157,7 @@ footer{padding:6px 4px 14px}
   <div class="quote"><small>Venta</small><strong id="blueSell">—</strong></div>
  </div>
  <p id="blueStatus" class="muted" aria-live="polite">Consultando cotización informativa…</p>
- <p class="muted">Fuente: DolarAPI. No se usa para calcular envíos.</p>
+
 </section>
 <section class="card compact-history">
  <details>
@@ -145,7 +171,36 @@ footer{padding:6px 4px 14px}
 const $=id=>document.getElementById(id);let mode='ARS',latest=null;
 const money=(n,c)=>new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:2}).format(n);
 function persistQuotes(){localStorage.buy=$('buy').value;localStorage.sell=$('sell').value;updateQuoteLabels()}
-function updateQuoteLabels(){$('buyLabel').textContent=money(Number($('buy').value||0),'ARS');$('sellLabel').textContent='Bs. '+Number($('sell').value||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}
+// Los selectores son solo de consulta y jamás cambian el precio usado por la calculadora.
+let viewArs='BUY',viewBob='SELL';
+let displayedRates=null;
+function selectedQuote(country,side){
+  if(displayedRates){
+    const key=(country==='ARS'?'ars':'bob')+(side==='BUY'?'Buy':'Sell');
+    const entry=displayedRates[key];
+    if(entry&&Number(entry.price)>0)return Number(entry.price);
+    // Compatibilidad con la estructura publicada anteriormente.
+    if(country==='ARS'&&side==='BUY')return Number(displayedRates.ars?.price)||null;
+    if(country==='BOB'&&side==='SELL')return Number(displayedRates.bob?.price)||null;
+    return null;
+  }
+  if(country==='ARS'&&side==='BUY')return Number($('buy').value)||null;
+  if(country==='BOB'&&side==='SELL')return Number($('sell').value)||null;
+  return null;
+}
+function updateQuoteLabels(){
+  const a=selectedQuote('ARS',viewArs),b=selectedQuote('BOB',viewBob);
+  $('buyLabel').textContent=a===null?'—':money(a,'ARS');
+  $('sellLabel').textContent=b===null?'—':'Bs. '+b.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+  for(const country of ['ars','bob'])for(const side of ['Buy','Sell']){
+    const chosen=(country==='ars'?viewArs:viewBob)===(side==='Buy'?'BUY':'SELL');
+    const btn=$(country+side+'View');btn.classList.toggle('selected',chosen);btn.setAttribute('aria-pressed',String(chosen));
+  }
+}
+$('arsBuyView').onclick=()=>{viewArs='BUY';updateQuoteLabels()};
+$('arsSellView').onclick=()=>{viewArs='SELL';updateQuoteLabels()};
+$('bobBuyView').onclick=()=>{viewBob='BUY';updateQuoteLabels()};
+$('bobSellView').onclick=()=>{viewBob='SELL';updateQuoteLabels()};
 ['buy','sell'].forEach(id=>$(id).addEventListener('change',persistQuotes));
 function setMode(m){mode=m;$('arsMode').className=m==='ARS'?'active':'ghost';$('bobMode').className=m==='BOB'?'active':'ghost';$('amountLabel').textContent=m==='ARS'?'Importe que entrega el cliente (ARS)':'Importe que debe recibir en Bolivia (BOB)';$('feeLabel').textContent=$('feeType').value==='fixed'?'Comisión fija ('+(m==='ARS'?'ARS':'BOB')+')':'Comisión (%)';$('result').classList.add('hidden')}
 $('arsMode').onclick=()=>setMode('ARS');$('bobMode').onclick=()=>setMode('BOB');
@@ -190,12 +245,13 @@ function loadLastRates(){
   }catch(e){return null}
 }
 let lastGoodRates=loadLastRates();
+displayedRates=lastGoodRates;
 let isRefreshing=false;
 const auto=$('autoMode');
 auto.checked=localStorage.getItem('autoMode')!=='false';
 function restoreManual(){
   $('buy').value=manualQuotes.buy;$('sell').value=manualQuotes.sell;
-  updateQuoteLabels();
+  displayedRates=null;updateQuoteLabels();
 }
 // Los cambios del usuario desactivan el modo automático para respetar su precio manual.
 for(const id of ['buy','sell']){
@@ -214,7 +270,7 @@ auto.addEventListener('change',()=>{
 function applyRates(rates){
   if(!auto.checked || !rates)return;
   $('buy').value=rates.ars.price;$('sell').value=rates.bob.price;
-  updateQuoteLabels();
+  displayedRates=rates;updateQuoteLabels();
 }
 function showRatesState(rates, error=''){
   const status=$('binanceStatus'),details=$('binanceDetails');
@@ -228,11 +284,12 @@ function showRatesState(rates, error=''){
   const when=date.toLocaleString('es-AR');
   const timeText=minutes<60?`hace ${minutes} min`:`hace ${Math.floor(minutes/60)} h`;
   const priceState=recent?'Cotización reciente.':'Cotización anterior: puede haber cambiado.';
-  const selected=auto.checked?'Se usa este último precio.':'Modo manual activo.';
+  const selected=auto.checked?'Cálculo: compra ARS / venta BOB.':'Modo manual activo.';
   status.textContent=`Binance P2P · última consulta: ${when} (${timeText}). ${priceState} ${selected}`+
     (error?` No se pudo obtener una nueva cotización: ${error}`:'');
   details.textContent='';
-  for(const [label,fiat,ad] of [['Compra USDT en Argentina','ARS',rates.ars],['Venta USDT en Bolivia','BOB',rates.bob]]){
+  for(const [label,fiat,ad] of [['Compra USDT Argentina','ARS',rates.arsBuy||rates.ars],['Venta USDT Argentina','ARS',rates.arsSell],['Compra USDT Bolivia','BOB',rates.bobBuy],['Venta USDT Bolivia','BOB',rates.bobSell||rates.bob]]){
+    if(!ad)continue;
     const line=document.createElement('div');line.className='history';
     const name=document.createElement('b');name.textContent=label+': '+formatP2pPrice(ad.price,fiat);
     const desc=document.createElement('div');desc.className='muted';
