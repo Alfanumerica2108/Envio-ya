@@ -135,6 +135,31 @@ button{min-height:46px;padding:10px 12px;border-radius:12px;background:linear-gr
 footer{text-align:center;color:#809798;font-size:10px;padding:10px 18px 12px}
 @media(max-width:370px){body{padding:8px 9px 22px}.card{padding:13px 10px}.country-quotes{gap:6px}.country-quote{padding:10px 7px}.quote-toggle button{font-size:10px;min-height:34px}.country-quote strong{font-size:clamp(16px,4.5vw,20px)}}
 
+
+/* Versión sincronizada y más compacta */
+header{padding:12px 5px 12px}
+.card{padding:12px 13px;margin:9px 0;border-radius:18px}
+h2{font-size:16px;margin-bottom:10px}
+.section-icon{height:25px;width:25px}
+.country-quote{padding:9px 9px 11px;border-radius:14px}
+.country-name{margin-bottom:7px}
+.country-quote strong{margin:9px 0 1px;font-size:clamp(16px,4.5vw,23px)}
+.quote-toggle button{min-height:33px}
+.edit-grid{margin-top:6px}
+.edit-grid label{margin:5px 0 4px;font-size:11px}
+.edit-grid input{min-height:40px;padding:8px 11px}
+.switch{margin:0 0 9px}
+.switch button{min-height:40px}
+label{margin:7px 0 4px}
+input,select{min-height:41px;padding:8px 11px}
+#calc{margin-top:10px;min-height:44px}
+.result{padding:11px;margin-top:9px}
+.auto-label{margin:0}
+#refreshBinance{margin-top:8px;min-height:40px}
+#binanceStatus{margin:6px 0}
+.blue-card .quote{padding:9px}
+.blue-card #blueStatus{margin:5px 0 0}
+@media(max-width:370px){.card{padding:11px 9px}.country-quote{padding:8px 6px}.country-quote strong{font-size:clamp(15px,4.35vw,20px)}}
 </style>
 </head>
 <body>
@@ -163,10 +188,10 @@ footer{text-align:center;color:#809798;font-size:10px;padding:10px 18px 12px}
   </div>
  </div>
  <div class="grid edit-grid">
-  <div><label for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
-  <div><label for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
+  <div><label id="arsPriceLabel" for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
+  <div><label id="bobPriceLabel" for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
  </div>
- <p class="muted">Cálculo: compra ARS · venta BOB.</p>
+ 
 </section>
 <section class="card">
  <h2><span class="section-icon">↗</span> Calcular envío</h2>
@@ -211,37 +236,73 @@ footer{text-align:center;color:#809798;font-size:10px;padding:10px 18px 12px}
 <script>
 const $=id=>document.getElementById(id);let mode='ARS',latest=null;
 const money=(n,c)=>new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:2}).format(n);
-function persistQuotes(){localStorage.buy=$('buy').value;localStorage.sell=$('sell').value;updateQuoteLabels()}
-// Los selectores son solo de consulta y jamás cambian el precio usado por la calculadora.
-let viewArs='BUY',viewBob='SELL';
+// Las tarjetas, los campos y la calculadora comparten exactamente los mismos precios.
+const price2=n=>Math.round((Number(n)+Number.EPSILON)*100)/100;
+const asInput=n=>Number.isFinite(n)&&n>0?price2(n).toFixed(2):'';
+let viewArs=localStorage.getItem('selectedArsSide')||'BUY';
+let viewBob=localStorage.getItem('selectedBobSide')||'SELL';
 let displayedRates=null;
 function selectedQuote(country,side){
-  if(displayedRates){
-    const key=(country==='ARS'?'ars':'bob')+(side==='BUY'?'Buy':'Sell');
-    const entry=displayedRates[key];
-    if(entry&&Number(entry.price)>0)return Number(entry.price);
-    // Compatibilidad con la estructura publicada anteriormente.
-    if(country==='ARS'&&side==='BUY')return Number(displayedRates.ars?.price)||null;
-    if(country==='BOB'&&side==='SELL')return Number(displayedRates.bob?.price)||null;
-    return null;
-  }
-  if(country==='ARS'&&side==='BUY')return Number($('buy').value)||null;
-  if(country==='BOB'&&side==='SELL')return Number($('sell').value)||null;
+  if(!displayedRates)return null;
+  const key=(country==='ARS'?'ars':'bob')+(side==='BUY'?'Buy':'Sell');
+  const entry=displayedRates[key];
+  if(entry&&Number(entry.price)>0)return Number(entry.price);
+  if(country==='ARS'&&side==='BUY')return Number(displayedRates.ars?.price)||null;
+  if(country==='BOB'&&side==='SELL')return Number(displayedRates.bob?.price)||null;
   return null;
 }
 function updateQuoteLabels(){
-  const a=selectedQuote('ARS',viewArs),b=selectedQuote('BOB',viewBob);
-  $('buyLabel').textContent=a===null?'—':money(a,'ARS');
-  $('sellLabel').textContent=b===null?'—':'Bs. '+b.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const a=Number($('buy').value), b=Number($('sell').value);
+  $('buyLabel').textContent=a>0?money(price2(a),'ARS'):'—';
+  $('sellLabel').textContent=b>0?'Bs. '+price2(b).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+  $('arsPriceLabel').textContent=(viewArs==='BUY'?'Compra':'Venta')+' (ARS)';
+  $('bobPriceLabel').textContent=(viewBob==='BUY'?'Compra':'Venta')+' (BOB)';
   for(const country of ['ars','bob'])for(const side of ['Buy','Sell']){
     const chosen=(country==='ars'?viewArs:viewBob)===(side==='Buy'?'BUY':'SELL');
-    const btn=$(country+side+'View');btn.classList.toggle('selected',chosen);btn.setAttribute('aria-pressed',String(chosen));
+    const btn=$(country+side+'View');
+    btn.classList.toggle('selected',chosen);btn.setAttribute('aria-pressed',String(chosen));
   }
 }
-$('arsBuyView').onclick=()=>{viewArs='BUY';updateQuoteLabels()};
-$('arsSellView').onclick=()=>{viewArs='SELL';updateQuoteLabels()};
-$('bobBuyView').onclick=()=>{viewBob='BUY';updateQuoteLabels()};
-$('bobSellView').onclick=()=>{viewBob='SELL';updateQuoteLabels()};
+function updateActiveQuoteFields(){
+  if(!auto.checked||!displayedRates)return;
+  const a=selectedQuote('ARS',viewArs), b=selectedQuote('BOB',viewBob);
+  $('buy').value=a===null?'':asInput(a);
+  $('sell').value=b===null?'':asInput(b);
+  localStorage.buy=$('buy').value;localStorage.sell=$('sell').value;
+  updateQuoteLabels();
+  $('result').classList.add('hidden');
+}
+function changeQuoteSide(country,side){
+  if(country==='ARS'){viewArs=side;localStorage.setItem('selectedArsSide',side);}
+  else{viewBob=side;localStorage.setItem('selectedBobSide',side);}
+  // Cambiar Compra/Venta vuelve a los precios P2P publicados.
+  if(lastGoodRates){
+    auto.checked=true;localStorage.setItem('autoMode','true');
+    displayedRates=lastGoodRates;updateActiveQuoteFields();
+  }else{
+    // Sin datos del mercado, no simular cotizaciones inexistentes.
+    auto.checked=true;localStorage.setItem('autoMode','true');
+    displayedRates=null;
+    if(country==='ARS')$('buy').value='';
+    else $('sell').value='';
+    updateQuoteLabels();
+    $('result').classList.add('hidden');
+    refreshBinance();
+  }
+}
+$('arsBuyView').onclick=()=>changeQuoteSide('ARS','BUY');
+$('arsSellView').onclick=()=>changeQuoteSide('ARS','SELL');
+$('bobBuyView').onclick=()=>changeQuoteSide('BOB','BUY');
+$('bobSellView').onclick=()=>changeQuoteSide('BOB','SELL');
+function persistQuotes(){
+  for(const id of ['buy','sell']){
+    if($(id).value&&Number($(id).value)>0){
+      $(id).value=asInput($(id).value);
+    }
+    localStorage[id]=$(id).value;
+  }
+  updateQuoteLabels();
+}
 ['buy','sell'].forEach(id=>$(id).addEventListener('change',persistQuotes));
 function setMode(m){mode=m;$('arsMode').className=m==='ARS'?'active':'ghost';$('bobMode').className=m==='BOB'?'active':'ghost';$('amountLabel').textContent=m==='ARS'?'Importe que entrega el cliente (ARS)':'Importe que debe recibir en Bolivia (BOB)';$('feeLabel').textContent=$('feeType').value==='fixed'?'Comisión fija ('+(m==='ARS'?'ARS':'BOB')+')':'Comisión (%)';$('result').classList.add('hidden')}
 $('arsMode').onclick=()=>setMode('ARS');$('bobMode').onclick=()=>setMode('BOB');
@@ -259,7 +320,11 @@ $('calc').onclick=()=>{
  $('baseOut').textContent=mode==='ARS'?money(base,'ARS'):'Bs. '+base.toFixed(2);
  $('result').classList.remove('hidden')
 };
-if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();
+if(localStorage.buy)$('buy').value=localStorage.buy;
+if(localStorage.sell)$('sell').value=localStorage.sell;
+$('buy').value=asInput($('buy').value);
+$('sell').value=asInput($('sell').value);
+updateQuoteLabels();
 
 // Los precios vienen de precios.json publicado por GitHub Pages, no de Binance directamente.
 const manualQuotes = {
@@ -288,13 +353,16 @@ let isRefreshing=false;
 const auto=$('autoMode');
 auto.checked=localStorage.getItem('autoMode')!=='false';
 function restoreManual(){
-  $('buy').value=manualQuotes.buy;$('sell').value=manualQuotes.sell;
-  displayedRates=null;updateQuoteLabels();
+  $('buy').value=asInput(manualQuotes.buy);$('sell').value=asInput(manualQuotes.sell);
+  displayedRates=null;
+  $('buy').value=asInput($('buy').value);$('sell').value=asInput($('sell').value);
+  updateQuoteLabels();
 }
 // Los cambios del usuario desactivan el modo automático para respetar su precio manual.
 for(const id of ['buy','sell']){
   $(id).addEventListener('input',()=>{
     auto.checked=false;localStorage.setItem('autoMode','false');
+    displayedRates=null;updateQuoteLabels();$('result').classList.add('hidden');
     const val=Number($(id).value);
     if(val>0){manualQuotes[id==='buy'?'buy':'sell']=val;localStorage.setItem(id==='buy'?'manualBuy':'manualSell',String(val));}
   });
@@ -307,8 +375,8 @@ auto.addEventListener('change',()=>{
 });
 function applyRates(rates){
   if(!auto.checked || !rates)return;
-  $('buy').value=rates.ars.price;$('sell').value=rates.bob.price;
-  displayedRates=rates;updateQuoteLabels();
+  displayedRates=rates;
+  updateActiveQuoteFields();
 }
 function showRatesState(rates, error=''){
   const status=$('binanceStatus'),details=$('binanceDetails');
