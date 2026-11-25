@@ -87,6 +87,54 @@ footer{padding:6px 4px 14px}
 .country-quote small{min-height:0!important;font-size:10px;color:#90ac9d}
 .quote-card .edit-grid{margin-top:5px}
 .quote-card .muted{font-size:10px;margin-bottom:0}
+
+/* ENVÍOS YA v6 — rediseño elegante, compacto y legible */
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#edf7f3;background:#080f13}
+body{max-width:600px;padding:10px 12px 26px;background:radial-gradient(ellipse 130% 330px at 50% -100px,#1d5347 0%,#0a171c 55%,#080f13 100%);min-height:100vh}
+header{padding:18px 5px 20px}
+h1{font-size:clamp(25px,6.9vw,33px);letter-spacing:-1px;line-height:1.1;font-weight:850}
+header p{font-size:10px;color:#a1bdb4;letter-spacing:.5px;margin-top:6px}
+.logo{width:47px;height:47px;border-radius:16px;background:linear-gradient(145deg,#35c995,#087954);box-shadow:0 9px 24px #0f976b44;border:1px solid #8aecc14f;font-size:18px}
+.card{background:linear-gradient(155deg,#19272b,#101b20 92%);border:1px solid #38505191;border-radius:21px;padding:15px;margin:11px 0;box-shadow:0 12px 27px #0004}
+h2{font-size:17px;letter-spacing:-.45px;margin:0 0 13px;display:flex;align-items:center;gap:8px;font-weight:790}
+.section-icon{width:27px;height:27px;border-radius:9px;background:#224a43;display:inline-flex;align-items:center;justify-content:center;color:#81e8b8;font-size:18px;flex-shrink:0}
+.country-quotes{gap:9px}
+.country-quote{background:linear-gradient(155deg,#133c33,#0d2525 84%);border:1px solid #36775b86;border-radius:16px;padding:11px 10px 13px}
+.country-name{font-size:12px;margin-bottom:10px;color:#f3fff7}
+.quote-toggle{background:#0a1b19;border:1px solid #31574b;border-radius:11px;padding:3px;gap:3px}
+.quote-toggle button{border-radius:8px;min-height:36px;font-size:11px;color:#a5cabc}
+.quote-toggle button.selected{background:linear-gradient(145deg,#25b384,#127b5a);box-shadow:0 3px 9px #119a6a4f}
+.country-quote strong{font-size:clamp(17px,4.5vw,24px);margin:13px 0 2px;letter-spacing:-.65px}
+.country-quote small{font-size:10px;color:#98bdb0}
+label{font-size:11px;margin:10px 0 5px;color:#aebfc0}
+input,select{background:#091619;border:1px solid #395250;border-radius:12px;min-height:44px;padding:10px 12px;font-size:16px}
+input:focus,select:focus{border-color:#45d5a1;box-shadow:0 0 0 3px #40be8c22}
+.edit-grid{gap:9px;margin-top:9px}
+.edit-grid label{min-height:0;font-size:10px}
+.edit-grid input{font-size:16px}
+.muted,.quote-card .muted{font-size:10px;line-height:1.4;color:#9aafb0}
+.quote-card p.muted{margin:8px 0 0}
+button{min-height:46px;padding:10px 12px;border-radius:12px;background:linear-gradient(140deg,#29ba86,#137f61);border:1px solid #51daa646;font-size:13px;box-shadow:0 6px 14px #0003}
+.switch{background:#0a181b;padding:3px;border:1px solid #34504e;border-radius:13px;gap:3px;margin:2px 0 12px}
+.switch button{min-height:43px;margin:0;border-radius:10px;border:0;background:transparent;color:#b1c5bf;box-shadow:none}
+.switch button.active{background:linear-gradient(135deg,#20b27d,#12825d);color:#fff;box-shadow:0 3px 13px #12ae7e36}
+#calc{font-size:14px;margin-top:13px;font-weight:800;letter-spacing:.1px}
+.result{border:1px solid #3e9f79;background:linear-gradient(145deg,#114131,#103025);padding:13px;border-radius:15px}
+.big{color:#92f6c3}
+.auto-label{font-size:12px;gap:9px}
+.auto-label input{min-height:20px;width:20px;height:20px}
+#refreshBinance{background:#24483e;border:1px solid #44886d;color:#d9fae8;box-shadow:none;min-height:42px;font-size:12px}
+#binanceStatus{font-size:10px;margin-top:9px;color:#adcdc2}
+.extra-details summary{font-size:11px}
+.blue-card{background:linear-gradient(145deg,#15292d,#121d23)}
+.blue-subtitle{font-size:10px;margin-left:auto;color:#9cb4b2}
+.blue-card .quote{background:#0b191d;border:1px solid #294348;border-radius:13px;padding:11px}
+.blue-card .quote strong{font-size:clamp(17px,4.4vw,23px);letter-spacing:-.4px}
+.blue-card .quote small{font-size:10px}
+.blue-card #blueStatus{margin:8px 0 0}
+footer{text-align:center;color:#809798;font-size:10px;padding:10px 18px 12px}
+@media(max-width:370px){body{padding:8px 9px 22px}.card{padding:13px 10px}.country-quotes{gap:6px}.country-quote{padding:10px 7px}.quote-toggle button{font-size:10px;min-height:34px}.country-quote strong{font-size:clamp(16px,4.5vw,20px)}}
+
 </style>
 </head>
 <body>
@@ -95,7 +143,7 @@ footer{padding:6px 4px 14px}
  <div class="logo">YA</div>
 </header>
 <section class="card quote-card">
- <h2>📊 Cotizaciones</h2>
+ <h2><span class="section-icon">◈</span> Cotizaciones</h2>
  <div class="grid country-quotes">
   <div class="quote country-quote">
    <div class="country-name">🇦🇷 Argentina</div>
@@ -118,10 +166,10 @@ footer{padding:6px 4px 14px}
   <div><label for="buy">Compra (ARS)</label><input id="buy" type="number" step="0.01" value="1773.99"></div>
   <div><label for="sell">Venta (BOB)</label><input id="sell" type="number" step="0.01" value="11.99"></div>
  </div>
- <p class="muted">Compra ARS y venta BOB se usan para calcular. Los selectores superiores solo permiten consultar.</p>
+ <p class="muted">Cálculo: compra ARS · venta BOB.</p>
 </section>
 <section class="card">
- <h2>💸 Calcular envío</h2>
+ <h2><span class="section-icon">↗</span> Calcular envío</h2>
  <div class="switch">
   <button id="arsMode" class="active">ARS → BOB</button>
   <button id="bobMode" class="ghost">BOB → ARS</button>
@@ -139,11 +187,10 @@ footer{padding:6px 4px 14px}
   <div class="line"><span>USDT estimados</span><b id="usdt">0</b></div>
   <div class="line"><span>Comisión aplicada</span><b id="feeOut">0</b></div>
   <div class="line"><span>Importe base</span><b id="baseOut">0</b></div>
-  <button id="save">GUARDAR EN HISTORIAL</button>
  </div>
 </section>
 <section class="card binance-card">
- <h2>🔄 Binance P2P</h2>
+ <h2><span class="section-icon">↻</span> Binance P2P</h2>
  <label class="auto-label"><input id="autoMode" type="checkbox" checked>Usar precios automáticos</label>
 
  <button id="refreshBinance" type="button">COMPROBAR COTIZACIONES</button>
@@ -151,7 +198,7 @@ footer{padding:6px 4px 14px}
  <details class="extra-details"><summary>Ver anunciantes y métodos de pago</summary><div id="binanceDetails"></div></details>
 </section>
 <section class="card blue-card" aria-label="Dólar blue, solo de referencia">
- <h2>💵 Dólar blue <span class="blue-subtitle">Solo para consultar</span></h2>
+ <h2><span class="section-icon">◉</span> Dólar blue <span class="blue-subtitle">Solo consulta</span></h2>
  <div class="grid">
   <div class="quote"><small>Compra</small><strong id="blueBuy">—</strong></div>
   <div class="quote"><small>Venta</small><strong id="blueSell">—</strong></div>
@@ -159,14 +206,8 @@ footer{padding:6px 4px 14px}
  <p id="blueStatus" class="muted" aria-live="polite">Consultando cotización informativa…</p>
 
 </section>
-<section class="card compact-history">
- <details>
-  <summary>🧾 Historial de envíos</summary>
-  <div id="history" class="muted">Todavía no hay operaciones guardadas.</div>
-  <button id="clear" class="ghost">Borrar historial</button>
- </details>
-</section>
-<footer class="muted">Los resultados son estimaciones. Los precios P2P, límites de anuncios, medios de pago y comisiones pueden variar. Verifica cada operación antes de transferir o liberar USDT.</footer>
+
+<footer class="muted">Precios orientativos. Verifica la oferta antes de operar.</footer>
 <script>
 const $=id=>document.getElementById(id);let mode='ARS',latest=null;
 const money=(n,c)=>new Intl.NumberFormat('es-AR',{style:'currency',currency:c,maximumFractionDigits:2}).format(n);
@@ -218,10 +259,7 @@ $('calc').onclick=()=>{
  $('baseOut').textContent=mode==='ARS'?money(base,'ARS'):'Bs. '+base.toFixed(2);
  $('result').classList.remove('hidden')
 };
-$('save').onclick=()=>{if(!latest)return;let h=JSON.parse(localStorage.history||'[]');h.unshift(latest);localStorage.history=JSON.stringify(h);renderHistory();alert('Envío guardado en este teléfono.')};
-function renderHistory(){let h=JSON.parse(localStorage.history||'[]');$('history').innerHTML=h.length?h.map(x=>`<div class="history"><b>${x.date}</b><div class="line"><span>${x.mode==='ARS'?'ARS → BOB':'BOB → ARS'}</span><b>${x.currency==='BOB'?'Bs. '+x.out.toFixed(2):money(x.out,'ARS')}</b></div></div>`).join(''):'Todavía no hay operaciones guardadas.'}
-$('clear').onclick=()=>{if(confirm('¿Borrar todo el historial?')){localStorage.removeItem('history');renderHistory()}}
-if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();renderHistory();
+if(localStorage.buy)$('buy').value=localStorage.buy;if(localStorage.sell)$('sell').value=localStorage.sell;updateQuoteLabels();
 
 // Los precios vienen de precios.json publicado por GitHub Pages, no de Binance directamente.
 const manualQuotes = {
@@ -283,9 +321,7 @@ function showRatesState(rates, error=''){
   const recent=minutes<30;
   const when=date.toLocaleString('es-AR');
   const timeText=minutes<60?`hace ${minutes} min`:`hace ${Math.floor(minutes/60)} h`;
-  const priceState=recent?'Cotización reciente.':'Cotización anterior: puede haber cambiado.';
-  const selected=auto.checked?'Cálculo: compra ARS / venta BOB.':'Modo manual activo.';
-  status.textContent=`Binance P2P · última consulta: ${when} (${timeText}). ${priceState} ${selected}`+
+  status.textContent=`${recent?'Actualizado':'Precio anterior'} · ${when} (${timeText})`+
     (error?` No se pudo obtener una nueva cotización: ${error}`:'');
   details.textContent='';
   for(const [label,fiat,ad] of [['Compra USDT Argentina','ARS',rates.arsBuy||rates.ars],['Venta USDT Argentina','ARS',rates.arsSell],['Compra USDT Bolivia','BOB',rates.bobBuy],['Venta USDT Bolivia','BOB',rates.bobSell||rates.bob]]){
@@ -351,9 +387,8 @@ function showBlue(b,err=''){
   const updated=new Date(b.updatedAt);
   const age=Date.now()-updated.getTime();
   const old=age>60*60*1000;
-  $('blueStatus').textContent='Fuente: DolarAPI · '+updated.toLocaleString('es-AR')+
-    (old?' · Cotización anterior, puede haber cambiado.':' · Última referencia publicada.')+
-    (err?' No se pudo consultar una nueva: '+err:'');
+  $('blueStatus').textContent='Actualizado: '+updated.toLocaleString('es-AR')+
+    (old?' · Anterior':'')+(err?' · Sin datos nuevos':'');
 }
 async function refreshBlue(){
   if(blueRefreshing)return;
