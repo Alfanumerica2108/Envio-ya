@@ -1,31 +1,4 @@
-const CACHE = 'envios-ya-v5';
-const OFFLINE = ['./index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(OFFLINE)).then(() => self.skipWaiting()));
-});
-self.addEventListener('activate', event => {
-  event.waitUntil(Promise.all([
-    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('envios-ya-') && key !== CACHE).map(key => caches.delete(key)))),
-    self.clients.claim()
-  ]));
-});
-self.addEventListener('fetch', event => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.pathname.endsWith('/precios.json')) {
-    event.respondWith(fetch(req, {cache: 'no-store'}));
-    return;
-  }
-  if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).then(response => {
-      if (response.ok) {
-        const copy = response.clone();
-        event.waitUntil(caches.open(CACHE).then(cache => cache.put('./index.html', copy)));
-      }
-      return response;
-    }).catch(() => caches.match('./index.html')));
-    return;
-  }
-  event.respondWith(caches.match(req).then(hit => hit || fetch(req)));
-});
+const CACHE='envios-ya-remesa-v1',OFFLINE=['./index.html','./manifest.webmanifest','./remesa-icon.svg','./icon-192.png','./icon-512.png'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(OFFLINE)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('envios-ya-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));
+self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET')return;const url=new URL(r.url);if(url.origin!==self.location.origin)return;if(/\/(precios|dolar-blue)\.json$/.test(url.pathname)){e.respondWith(fetch(r,{cache:'no-store'}));return}if(r.mode==='navigate'){e.respondWith(fetch(r).then(response=>{if(response.ok){const copy=response.clone();e.waitUntil(caches.open(CACHE).then(c=>c.put('./index.html',copy)))}return response}).catch(()=>caches.match('./index.html')));return}e.respondWith(caches.match(r).then(hit=>hit||fetch(r)))});
